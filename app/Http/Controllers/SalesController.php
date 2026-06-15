@@ -44,12 +44,21 @@ class SalesController extends Controller
             return redirect()->route('view.sales')->with('error', 'Gagal! Kode Sales "' . $request->kode_sales . '" sudah terdaftar.');
         }
 
-        NamaSales::create([
-            'kode_sales' => trim($request->kode_sales),
-            'nama_sales' => trim($request->nama_sales),
-        ]);
-
-        return redirect()->route('view.sales')->with('success', 'Data sales berhasil ditambahkan');
+        try {
+            NamaSales::create([
+                'kode_sales' => trim($request->kode_sales),
+                'nama_sales' => trim($request->nama_sales),
+            ]);
+            return redirect()->route('view.sales')->with('success', 'Data sales berhasil ditambahkan');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? null;
+            if ($errorCode == 1062 || $errorCode == 19) {
+                return redirect()->route('view.sales')->with('error', 'Gagal menyimpan data! Kode Sales sudah terdaftar di database.');
+            }
+            return redirect()->route('view.sales')->with('error', 'Gagal menyimpan data! Terjadi kesalahan pada database.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.sales')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     public function updateSales(Request $request, $id)
@@ -66,21 +75,36 @@ class SalesController extends Controller
             return redirect()->route('view.sales')->with('error', 'Data sales tidak ditemukan');
         }
 
-        $sales->update([
-            'nama_sales' => $request->nama_sales,
-        ]);
-
-        return redirect()->route('view.sales')->with('success', 'Data sales berhasil diupdate');
+        try {
+            $sales->update([
+                'nama_sales' => $request->nama_sales,
+            ]);
+            return redirect()->route('view.sales')->with('success', 'Data sales berhasil diupdate');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? null;
+            if ($errorCode == 1062 || $errorCode == 19) {
+                return redirect()->route('view.sales')->with('error', 'Gagal mengupdate data! Kode Sales sudah terdaftar di database.');
+            }
+            return redirect()->route('view.sales')->with('error', 'Gagal mengupdate data! Terjadi kesalahan relasi atau integritas database.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.sales')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     public function destroySales($id)
     {
-        $sales = NamaSales::where('kode_sales', $id)->first();
-        if ($sales) {
-            $sales->delete();
-            return redirect()->route('view.sales')->with('success', 'Data sales berhasil dihapus');
+        try {
+            $sales = NamaSales::where('kode_sales', $id)->first();
+            if ($sales) {
+                $sales->delete();
+                return redirect()->route('view.sales')->with('success', 'Data sales berhasil dihapus');
+            }
+            return redirect()->route('view.sales')->with('error', 'Data sales tidak ditemukan');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('view.sales')->with('error', 'Gagal menghapus data! Data sales ini memiliki relasi aktif di database.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.sales')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
-        return redirect()->route('view.sales')->with('error', 'Data sales tidak ditemukan');
     }
 
     public function importSales(Request $request)
@@ -159,6 +183,8 @@ class SalesController extends Controller
 
             return $response->with('success', "$importedCount data sales berhasil diimpor.");
 
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('view.sales')->with('error', 'Gagal memproses file! Terjadi kesalahan database. Silakan periksa kembali kecocokan data file.');
         } catch (\Exception $e) {
             return redirect()->route('view.sales')->with('error', 'Gagal memproses file: ' . $e->getMessage());
         }

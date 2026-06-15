@@ -41,12 +41,21 @@ class NominalController extends Controller
             );
         }
 
-        Nominal::insert([
-            'kode_toko' => $kodeToko,
-            'nominal_transaksi' => $nominalTransaksi,
-        ]);
-
-        return redirect()->route('view.nominal')->with('success', 'Data nominal berhasil ditambahkan');
+        try {
+            Nominal::insert([
+                'kode_toko' => $kodeToko,
+                'nominal_transaksi' => $nominalTransaksi,
+            ]);
+            return redirect()->route('view.nominal')->with('success', 'Data nominal berhasil ditambahkan');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? null;
+            if ($errorCode == 1062 || $errorCode == 19) {
+                return redirect()->route('view.nominal')->with('error', 'Gagal menyimpan data! Kombinasi Kode Toko dengan Nominal tersebut sudah terdaftar di excel.');
+            }
+            return redirect()->route('view.nominal')->with('error', 'Gagal menyimpan data! Pastikan relasi kode toko sudah benar.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.nominal')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     public function updateNominal(Request $request, $id)
@@ -84,11 +93,20 @@ class NominalController extends Controller
             }
         }
 
-        Nominal::where('kode_toko', $kodeToko)
-            ->where('nominal_transaksi', $nominalLama)
-            ->update(['nominal_transaksi' => $newNominal]);
-
-        return redirect()->route('view.nominal')->with('success', 'Data nominal berhasil diupdate');
+        try {
+            Nominal::where('kode_toko', $kodeToko)
+                ->where('nominal_transaksi', $nominalLama)
+                ->update(['nominal_transaksi' => $newNominal]);
+            return redirect()->route('view.nominal')->with('success', 'Data nominal berhasil diupdate');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? null;
+            if ($errorCode == 1062 || $errorCode == 19) {
+                return redirect()->route('view.nominal')->with('error', 'Gagal mengupdate data! Kombinasi Kode Toko dengan Nominal tersebut sudah terdaftar di database.');
+            }
+            return redirect()->route('view.nominal')->with('error', 'Gagal mengupdate data! Pastikan input dan relasi database benar.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.nominal')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     public function destroyNominal(Request $request, $id)
@@ -102,15 +120,20 @@ class NominalController extends Controller
         $kodeToko = $id;
         $nominalTransaksi = trim($request->nominal_transaksi);
 
-        $deleted = Nominal::where('kode_toko', $kodeToko)
-            ->where('nominal_transaksi', $nominalTransaksi)
-            ->delete();
+        try {
+            $deleted = Nominal::where('kode_toko', $kodeToko)
+                ->where('nominal_transaksi', $nominalTransaksi)
+                ->delete();
 
-        if ($deleted) {
-            return redirect()->route('view.nominal')->with('success', 'Data nominal berhasil dihapus');
+            if ($deleted) {
+                return redirect()->route('view.nominal')->with('success', 'Data nominal berhasil dihapus');
+            }
+            return redirect()->route('view.nominal')->with('error', 'Data nominal tidak ditemukan');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('view.nominal')->with('error', 'Gagal menghapus data! Data ini memiliki relasi aktif di database.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.nominal')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
-
-        return redirect()->route('view.nominal')->with('error', 'Data nominal tidak ditemukan');
     }
 
     public function importNominal(Request $request)
@@ -191,6 +214,8 @@ class NominalController extends Controller
             }
 
             return $response->with('success', "$importedCount data nominal berhasil diimpor.");
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('view.nominal')->with('error', 'Gagal memproses file! Terjadi kesalahan database. Pastikan relasi kode toko sudah terdaftar di data toko.');
         } catch (\Exception $e) {
             return redirect()->route('view.nominal')->with('error', 'Gagal memproses file: ' . $e->getMessage());
         }

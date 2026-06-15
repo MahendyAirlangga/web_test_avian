@@ -32,17 +32,36 @@ class KodeTokoController extends Controller
             ? (int)$lastKodeTokoBaru->kode_toko_baru + 1
             : 1;
 
-        KodeToko::create([
-            'kode_toko_baru' => $newKodeTokoBaru,
-            'kode_toko_lama' => trim($request->kode_toko_lama),
-        ]);
-        return redirect()->route('view.toko')->with('success', 'Data berhasil ditambahkan');
+        try {
+            KodeToko::create([
+                'kode_toko_baru' => $newKodeTokoBaru,
+                'kode_toko_lama' => trim($request->kode_toko_lama),
+            ]);
+            return redirect()->route('view.toko')->with('success', 'Data berhasil ditambahkan');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? null;
+            if ($errorCode == 1062 || $errorCode == 19) {
+                return redirect()->route('view.toko')->with('error', 'Gagal menyimpan data! Kode Toko sudah terdaftar di database.');
+            }
+            return redirect()->route('view.toko')->with('error', 'Gagal menyimpan data! Terjadi kesalahan pada database.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.toko')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     public function destroyToko($id){
-        $toko = KodeToko::find($id);
-        $toko->delete();
-        return redirect()->route('view.toko')->with('success', 'Data berhasil dihapus');
+        try {
+            $toko = KodeToko::find($id);
+            if (!$toko) {
+                return redirect()->route('view.toko')->with('error', 'Data toko tidak ditemukan');
+            }
+            $toko->delete();
+            return redirect()->route('view.toko')->with('success', 'Data berhasil dihapus');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('view.toko')->with('error', 'Gagal menghapus data! Kode toko ini masih digunakan di tabel nominal atau area sales.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.toko')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     public function updateToko(Request $request, $id)
@@ -60,13 +79,22 @@ class KodeTokoController extends Controller
             return redirect()->route('view.toko')->with('error', 'Data toko tidak ditemukan');
         }
 
-        // Update data
-        $toko->update([
-            'kode_toko_baru' => $request->kode_toko_baru,
-            'kode_toko_lama' => $request->kode_toko_lama,
-        ]);
-
-        return redirect()->route('view.toko')->with('success', 'Data toko berhasil diupdate');
+        try {
+            // Update data
+            $toko->update([
+                'kode_toko_baru' => $request->kode_toko_baru,
+                'kode_toko_lama' => $request->kode_toko_lama,
+            ]);
+            return redirect()->route('view.toko')->with('success', 'Data toko berhasil diupdate');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? null;
+            if ($errorCode == 1062 || $errorCode == 19) {
+                return redirect()->route('view.toko')->with('error', 'Gagal mengupdate data! Kode Toko Baru atau Kode Toko Lama sudah terdaftar di database.');
+            }
+            return redirect()->route('view.toko')->with('error', 'Gagal mengupdate data! Terjadi kesalahan relasi atau integritas database.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.toko')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     public function importToko(Request $request)
@@ -146,6 +174,8 @@ class KodeTokoController extends Controller
 
             return $response->with('success', "$importedCount data toko berhasil diimpor.");
 
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('view.toko')->with('error', 'Gagal memproses file! Terjadi kesalahan database. Silakan periksa kembali kecocokan data file.');
         } catch (\Exception $e) {
             return redirect()->route('view.toko')->with('error', 'Gagal memproses file: ' . $e->getMessage());
         }

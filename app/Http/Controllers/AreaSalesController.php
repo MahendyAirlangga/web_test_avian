@@ -39,12 +39,21 @@ class AreaSalesController extends Controller
             );
         }
 
-        AreaSales::insert([
-            'kode_toko'  => $kodeToko,
-            'area_sales' => $areaSales,
-        ]);
-
-        return redirect()->route('view.area_sales')->with('success', 'Data area sales berhasil ditambahkan');
+        try {
+            AreaSales::insert([
+                'kode_toko'  => $kodeToko,
+                'area_sales' => $areaSales,
+            ]);
+            return redirect()->route('view.area_sales')->with('success', 'Data area sales berhasil ditambahkan');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? null;
+            if ($errorCode == 1062 || $errorCode == 19) {
+                return redirect()->route('view.area_sales')->with('error', 'Gagal menyimpan data! Kombinasi Kode Toko dengan Area sudah terdaftar di database.');
+            }
+            return redirect()->route('view.area_sales')->with('error', 'Gagal menyimpan data! Pastikan relasi kode toko sudah benar.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.area_sales')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     public function updateAreaSales(Request $request, $id)
@@ -81,11 +90,20 @@ class AreaSalesController extends Controller
             }
         }
 
-        AreaSales::where('kode_toko', $kodeToko)
-            ->where('area_sales', $areaSalesLama)
-            ->update(['area_sales' => $newArea]);
-
-        return redirect()->route('view.area_sales')->with('success', 'Data area sales berhasil diupdate');
+        try {
+            AreaSales::where('kode_toko', $kodeToko)
+                ->where('area_sales', $areaSalesLama)
+                ->update(['area_sales' => $newArea]);
+            return redirect()->route('view.area_sales')->with('success', 'Data area sales berhasil diupdate');
+        } catch (\Illuminate\Database\QueryException $e) {
+            $errorCode = $e->errorInfo[1] ?? null;
+            if ($errorCode == 1062 || $errorCode == 19) {
+                return redirect()->route('view.area_sales')->with('error', 'Gagal mengupdate data! Kombinasi Kode Toko dengan Area sudah terdaftar di database.');
+            }
+            return redirect()->route('view.area_sales')->with('error', 'Gagal mengupdate data! Pastikan input dan relasi database benar.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.area_sales')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
+        }
     }
 
     public function destroyAreaSales(Request $request, $id)
@@ -99,15 +117,20 @@ class AreaSalesController extends Controller
         $kodeToko  = $id;
         $areaSales = trim($request->area_sales);
 
-        $deleted = AreaSales::where('kode_toko', $kodeToko)
-            ->where('area_sales', $areaSales)
-            ->delete();
+        try {
+            $deleted = AreaSales::where('kode_toko', $kodeToko)
+                ->where('area_sales', $areaSales)
+                ->delete();
 
-        if ($deleted) {
-            return redirect()->route('view.area_sales')->with('success', 'Data area sales berhasil dihapus');
+            if ($deleted) {
+                return redirect()->route('view.area_sales')->with('success', 'Data area sales berhasil dihapus');
+            }
+            return redirect()->route('view.area_sales')->with('error', 'Data area sales tidak ditemukan');
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('view.area_sales')->with('error', 'Gagal menghapus data! Data ini memiliki relasi aktif di database.');
+        } catch (\Exception $e) {
+            return redirect()->route('view.area_sales')->with('error', 'Terjadi kesalahan: ' . $e->getMessage());
         }
-
-        return redirect()->route('view.area_sales')->with('error', 'Data area sales tidak ditemukan');
     }
 
     public function importAreaSales(Request $request)
@@ -185,6 +208,8 @@ class AreaSalesController extends Controller
             }
 
             return $response->with('success', "$importedCount data area sales berhasil diimpor.");
+        } catch (\Illuminate\Database\QueryException $e) {
+            return redirect()->route('view.area_sales')->with('error', 'Gagal memproses file! Terjadi kesalahan database. Pastikan relasi kode toko sudah terdaftar di data toko.');
         } catch (\Exception $e) {
             return redirect()->route('view.area_sales')->with('error', 'Gagal memproses file: ' . $e->getMessage());
         }
